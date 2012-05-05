@@ -1,9 +1,11 @@
+#! /usr/bin/env python3
 import os
 from xml.dom import minidom
 from fnmatch import fnmatch
 from hashlib import sha256
 from zipfile import ZipFile
 from datetime import datetime
+import argparse
 
 def version_compare(v1, v2):
     if v1 == v2:
@@ -21,7 +23,9 @@ class ApsPackageBuilder:
     ignore_path = [
         APP_META_FILE,
         APP_LIST_FILE,
-        '*' + PACKAGE_POSTFIX
+        '*' + PACKAGE_POSTFIX,
+        '.project',
+        'APS Package'
     ]
 
     package_dir = None
@@ -45,17 +49,24 @@ class ApsPackageBuilder:
         for item in package_list:
             zip.write(item['path'], arcname=item['name'])
 
-        zip.writestr(self.APP_META_FILE, self._generate_app_meta_file())
+        app_meta = self._generate_app_meta_file()
+        zip.writestr(self.APP_META_FILE, app_meta)
 
         if version_compare('1.2', package_meta['aps_version']) > -1:
-            zip.writestr(self.APP_LIST_FILE, self._generate_app_list_file(package_list))
+            applist = self._generate_app_list_file(package_list, app_meta)
+            zip.writestr(self.APP_LIST_FILE, applist)
 
         zip.close()
 
     def _get_package_list(self):
         base_dir = self.package_dir
-        is_ignore = lambda path, ipaths: any([fnmatch(path, ipath) for ipath in ipaths])
         package_list = []
+
+        def is_ignore(path, *args, **kwargs):
+             for ipath in self.ignore_path:
+                 if fnmatch(path, ipath):
+                      return True
+             return False
 
         for root, folders, files in os.walk(base_dir):
             for folder in folders:
@@ -74,7 +85,7 @@ class ApsPackageBuilder:
                 file_path = os.path.join(root, file)
                 file_name = os.path.relpath(file_path, base_dir)
 
-                if is_ignore(file_name, base_dir):
+                if is_ignore(file_name, self.ignore_path):
                     continue
 
                 package_list.append({
@@ -105,7 +116,7 @@ class ApsPackageBuilder:
     def _sha256_file(self, file):
         return sha256(open(file, 'rb').read()).hexdigest()
 
-    def _generate_app_list_file(self, package_list):
+    def _generate_app_list_file(self, package_list, app_meta=None):
         doc = minidom.Document()
         root = doc.createElement('files')
         root.setAttribute('xmlns', 'http://apstandard.com/ns/1')
@@ -121,17 +132,37 @@ class ApsPackageBuilder:
             element.setAttribute("size", str(item['size']))
             root.appendChild(element)
 
+        if(app_meta is not None):
+            element = doc.createElement('file')
+            element.setAttribute("sha256", sha256(app_meta).hexdigest())
+            element.setAttribute('name', self.APP_META_FILE)
+            element.setAttribute('size', str(len(app_meta)))
+            root.appendChild(element)
+
         doc.appendChild(root)
 
-        return doc.toxml()
+        return doc.toxml().encode('utf-8')
 
     def _generate_app_meta_file(self):
         dom = self._package_meta_dom
         dom.documentElement.setAttribute('packaged', datetime.utcnow().replace(microsecond=0).isoformat(sep='T'))
-        return dom.toxml()
+        return dom.toxml().encode('utf-8')
 
 def main():
-    pass
+    current_dir = os.getcwd()
+    input_dir = None
+    output_dir = None
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', default=current_dir)
+    parser.add_argument('-i', default=current_dir)
+    args = parser.parse_args();
+
+    input_dir = os.path.abspath(args.i)
+    output_dir = os.path.abspath(args.o)
+
+    builder = ApsPackageBuilder(input_dir, output_dir)
+    builder.build()
 
 if __name__ == '__main__':
     main()
