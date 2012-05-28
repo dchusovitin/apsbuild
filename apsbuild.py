@@ -154,12 +154,13 @@ def main():
     output_dir = None
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', default=current_dir)
-    parser.add_argument('-i', default=current_dir)
+    parser.add_argument('-o', '--output', default=current_dir)
+    parser.add_argument('-i', '--input', default=current_dir)
+    parser.add_argument('-v', '--validate')
     args = parser.parse_args();
 
-    input_dir = os.path.abspath(args.i)
-    output_dir = os.path.abspath(args.o)
+    input_dir = os.path.abspath(args.input)
+    output_dir = os.path.abspath(args.output)
 
     builder = ApsPackageBuilder(input_dir, output_dir)
     builder.build()
