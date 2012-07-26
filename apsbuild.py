@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python2
 import os
 from xml.dom import minidom
 from fnmatch import fnmatch
@@ -24,8 +24,6 @@ class ApsPackageBuilder:
         APP_META_FILE,
         APP_LIST_FILE,
         '*' + PACKAGE_POSTFIX,
-        '.project',
-        'APS Package'
     ]
 
     package_dir = None
